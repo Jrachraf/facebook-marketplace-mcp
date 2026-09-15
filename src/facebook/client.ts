@@ -20,8 +20,9 @@ import {
 import { parseSearchResponse, parseListingDetailFromPage } from "./parser.js";
 import { RateLimiter } from "../utils/rate-limit.js";
 
-const GRAPHQL_URL = "https://www.facebook.com/api/graphql/";
-const MARKETPLACE_URL = "https://www.facebook.com/marketplace/";
+const FB_HOST = process.env.FACEBOOK_HOST ?? "www.facebook.com";
+const GRAPHQL_URL = `https://${FB_HOST}/api/graphql/`;
+const MARKETPLACE_URL = `https://${FB_HOST}/marketplace/`;
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
@@ -183,8 +184,8 @@ export class FacebookClient {
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-origin",
-        Origin: "https://www.facebook.com",
-        Referer: "https://www.facebook.com/marketplace/",
+        Origin: `https://${FB_HOST}`,
+        Referer: MARKETPLACE_URL,
         "X-FB-LSD": session.lsd,
       },
       body: body.toString(),
