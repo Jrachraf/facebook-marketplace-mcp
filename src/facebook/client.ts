@@ -20,6 +20,34 @@ import {
 import { parseSearchResponse, parseListingDetailFromPage } from "./parser.js";
 import { RateLimiter } from "../utils/rate-limit.js";
 
+import { ProxyAgent, setGlobalDispatcher } from "undici";
+
+/**
+ * Route all Facebook traffic through a proxy when FACEBOOK_PROXY is set
+ * (http://user:pass@host:port). Needed to run from a datacenter: Facebook
+ * rejects Marketplace from IPs that don't match the account's country, so this
+ * should be a residential proxy in the account's country (e.g. Morocco).
+ */
+function installProxy(): void {
+  const url = process.env.FACEBOOK_PROXY?.trim();
+  if (!url) return;
+  try {
+    const u = new URL(url);
+    const uri = `${u.protocol}//${u.host}`;
+    const opts: { uri: string; token?: string } = { uri };
+    if (u.username) {
+      const user = decodeURIComponent(u.username);
+      const pass = decodeURIComponent(u.password);
+      opts.token = "Basic " + Buffer.from(`${user}:${pass}`).toString("base64");
+    }
+    setGlobalDispatcher(new ProxyAgent(opts));
+    console.error(`[mcp] routing Facebook traffic through proxy ${u.host}`);
+  } catch (error) {
+    console.error(`[mcp] invalid FACEBOOK_PROXY, ignoring: ${(error as Error).message}`);
+  }
+}
+installProxy();
+
 const FB_HOST = process.env.FACEBOOK_HOST ?? "www.facebook.com";
 const GRAPHQL_URL = `https://${FB_HOST}/api/graphql/`;
 const MARKETPLACE_URL = `https://${FB_HOST}/marketplace/`;

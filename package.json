@@ -1,7 +1,7 @@
 {
   "name": "facebook-marketplace-mcp",
   "version": "1.0.0",
-  "description": "MCP server for Facebook Marketplace — direct GraphQL API access",
+  "description": "MCP server for Facebook Marketplace \u2014 direct GraphQL API access",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -16,6 +16,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^11.0.0",
+    "undici": "^6.21.1",
     "zod": "^3.25.0"
   },
   "devDependencies": {
