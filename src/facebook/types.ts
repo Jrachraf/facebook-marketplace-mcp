@@ -15,6 +15,9 @@ export interface FacebookSession {
   lsd: string;
   jazoest: string;
   clientRevision: string;
+  spinT: string;
+  hsi: string;
+  hasteSession: string;
   userId: string;
 }
 

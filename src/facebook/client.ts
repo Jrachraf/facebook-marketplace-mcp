@@ -103,6 +103,9 @@ export class FacebookClient {
     lsd: string;
     jazoest: string;
     clientRevision: string;
+    spinT: string;
+    hsi: string;
+    hasteSession: string;
   }> {
     await this.rateLimiter.wait();
 
@@ -151,12 +154,18 @@ export class FacebookClient {
       html.match(/__spin_r:\s*(\d+)/);
     const clientRevision = revMatch ? revMatch[1] : "1";
 
-    return { fbDtsg, lsd, jazoest, clientRevision };
+    // Relay routing params the browser attaches alongside doc_id.
+    const spinT = html.match(/"__spin_t":(\d+)/)?.[1] ?? Math.floor(Date.now() / 1000).toString();
+    const hsi = html.match(/"hsi":"(\d+)"/)?.[1] ?? "";
+    const hasteSession = html.match(/"haste_session":"([^"]+)"/)?.[1] ?? "";
+
+    return { fbDtsg, lsd, jazoest, clientRevision, spinT, hsi, hasteSession };
   }
 
   private async graphqlRequest(
     docId: string,
-    variables: Record<string, unknown>
+    variables: Record<string, unknown>,
+    friendlyName = "CometMarketplaceSearchContentContainerQuery"
   ): Promise<unknown> {
     const session = await this.ensureSession();
     await this.rateLimiter.wait();
@@ -164,14 +173,26 @@ export class FacebookClient {
     this.reqCounter++;
 
     const body = new URLSearchParams({
-      fb_dtsg: session.fbDtsg,
-      lsd: session.lsd,
-      jazoest: session.jazoest,
-      doc_id: docId,
-      variables: JSON.stringify(variables),
+      av: session.userId,
+      __user: session.userId,
       __a: "1",
       __req: this.reqCounter.toString(36),
+      __hs: session.hasteSession ?? "",
+      __ccg: "EXCELLENT",
       __rev: session.clientRevision,
+      __hsi: session.hsi ?? "",
+      __comet_req: "15",
+      fb_dtsg: session.fbDtsg,
+      jazoest: session.jazoest,
+      lsd: session.lsd,
+      __spin_r: session.clientRevision,
+      __spin_b: "trunk",
+      __spin_t: session.spinT ?? "",
+      fb_api_caller_class: "RelayModern",
+      fb_api_req_friendly_name: friendlyName,
+      variables: JSON.stringify(variables),
+      server_timestamps: "true",
+      doc_id: docId,
     });
 
     const res = await fetch(GRAPHQL_URL, {
@@ -187,6 +208,8 @@ export class FacebookClient {
         Origin: `https://${FB_HOST}`,
         Referer: MARKETPLACE_URL,
         "X-FB-LSD": session.lsd,
+        "X-FB-Friendly-Name": friendlyName,
+        "X-ASBD-ID": "359341",
       },
       body: body.toString(),
     });
@@ -209,11 +232,21 @@ export class FacebookClient {
       text = text.slice(jsonStart);
     }
 
+    let json: unknown;
     try {
-      return JSON.parse(text);
+      json = JSON.parse(text);
     } catch {
       throw new Error(`Failed to parse GraphQL response: ${text.slice(0, 200)}`);
     }
+    if (json && typeof json === "object" && "errors" in json && Array.isArray((json as { errors: unknown[] }).errors) && (json as { errors: unknown[] }).errors.length) {
+      const msg = (json as { errors: Array<{ message?: string }> }).errors[0]?.message ?? "unknown";
+      throw new Error(`Facebook GraphQL error: ${msg} (doc_id ${docId})`);
+    }
+    if (json && typeof json === "object" && "error" in json && (json as { error: unknown }).error) {
+      const j = json as { errorSummary?: string; errorDescription?: string };
+      throw new Error(`Facebook GraphQL error: ${j.errorSummary ?? ""} ${j.errorDescription ?? ""} (doc_id ${docId} — session or query may be stale)`.trim());
+    }
+    return json;
   }
 
   async searchListings(params: SearchParams): Promise<SearchResult> {
