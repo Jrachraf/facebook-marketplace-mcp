@@ -11,7 +11,7 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 FROM node:20-slim
-ENV NODE_ENV=production MCP_TRANSPORT=http PORT=3333 HOST=0.0.0.0
+ENV NODE_ENV=production MCP_TRANSPORT=http PORT=3333 HOST=0.0.0.0 FACEBOOK_HOST=web.facebook.com
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
