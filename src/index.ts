@@ -45,6 +45,7 @@ function resolveCookiesFile(): string | undefined {
   return file;
 }
 
+console.error(`[mcp] facebook host: ${process.env.FACEBOOK_HOST ?? "www.facebook.com"} | session: ${process.env.FACEBOOK_COOKIES_JSON ? "COOKIES_JSON" : process.env.FACEBOOK_COOKIES_FILE ? "COOKIES_FILE" : "chrome:" + (process.env.CHROME_PROFILE ?? "Default")}`);
 const client = new FacebookClient({
   maxRequestsPerMinute: Number(process.env.MAX_REQUESTS_PER_MINUTE ?? 3),
   chromeProfile: process.env.CHROME_PROFILE ?? "Default",
