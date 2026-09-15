@@ -23,6 +23,7 @@ import {
 const client = new FacebookClient({
   maxRequestsPerMinute: 3,
   chromeProfile: process.env.CHROME_PROFILE ?? "Default",
+  cookiesFile: process.env.FACEBOOK_COOKIES_FILE,
 });
 
 const server = new McpServer({

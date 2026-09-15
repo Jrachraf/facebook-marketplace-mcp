@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import {
   extractChromeCookies,
+  loadCookiesFromFile,
   cookiesToHeader,
   getCookieValue,
 } from "./auth.js";
@@ -43,15 +44,19 @@ export class FacebookClient {
   private rateLimiter: RateLimiter;
   private reqCounter = 0;
   private chromeProfile: string;
+  private cookiesFile: string | undefined;
 
   constructor(
     options: {
       maxRequestsPerMinute?: number;
       chromeProfile?: string;
+      /** Path to a cookie export (JSON or Netscape). When set, Chrome is not read. */
+      cookiesFile?: string;
     } = {}
   ) {
     this.rateLimiter = new RateLimiter(options.maxRequestsPerMinute ?? 3);
     this.chromeProfile = options.chromeProfile ?? "Default";
+    this.cookiesFile = options.cookiesFile;
   }
 
   async ensureSession(): Promise<FacebookSession> {
@@ -60,7 +65,9 @@ export class FacebookClient {
   }
 
   async initSession(): Promise<FacebookSession> {
-    const cookies = extractChromeCookies("facebook.com", this.chromeProfile);
+    const cookies = this.cookiesFile
+      ? loadCookiesFromFile(this.cookiesFile, "facebook.com")
+      : extractChromeCookies("facebook.com", this.chromeProfile);
 
     if (cookies.length === 0) {
       throw new Error(

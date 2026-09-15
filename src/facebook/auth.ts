@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
+import fs from "node:fs";
 import Database from "better-sqlite3";
 import type { FacebookCookie } from "./types.js";
 
@@ -168,4 +169,59 @@ export function getCookieValue(
   name: string
 ): string | undefined {
   return cookies.find((c) => c.name === name)?.value;
+}
+
+
+/**
+ * Load Facebook cookies from a file instead of Chrome + Keychain, so the server
+ * can run on Linux. Accepts either a JSON array as exported by browser cookie
+ * extensions ({name, value, domain, path, expirationDate, secure, httpOnly}) or
+ * the Netscape cookies.txt format.
+ */
+export function loadCookiesFromFile(
+  filePath: string,
+  domain: string
+): FacebookCookie[] {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const trimmed = raw.trim();
+  const matches = (host: string) => host.replace(/^\./, "").endsWith(domain);
+
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    const parsed = JSON.parse(trimmed) as unknown;
+    const list = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray((parsed as { cookies?: unknown[] }).cookies)
+        ? (parsed as { cookies: unknown[] }).cookies
+        : [];
+    return (list as Array<Record<string, unknown>>)
+      .filter((c) => typeof c.name === "string" && typeof c.value === "string")
+      .map((c) => ({
+        host: String(c.domain ?? c.host ?? `.${domain}`),
+        name: String(c.name),
+        value: String(c.value),
+        path: String(c.path ?? "/"),
+        expires: Number(c.expirationDate ?? c.expires ?? 0),
+        secure: Boolean(c.secure),
+        httpOnly: Boolean(c.httpOnly),
+      }))
+      .filter((c) => matches(c.host));
+  }
+
+  // Netscape format: domain \t include_subdomains \t path \t secure \t expires \t name \t value
+  return trimmed
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^#HttpOnly_/, ""))
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.split("\t"))
+    .filter((cols) => cols.length >= 7)
+    .map((cols) => ({
+      host: cols[0],
+      name: cols[5],
+      value: cols.slice(6).join("\t"),
+      path: cols[2] || "/",
+      expires: Number(cols[4]) || 0,
+      secure: cols[3]?.toUpperCase() === "TRUE",
+      httpOnly: false,
+    }))
+    .filter((c) => matches(c.host));
 }
