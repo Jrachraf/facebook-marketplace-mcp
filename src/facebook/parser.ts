@@ -97,12 +97,20 @@ export function parseListingDetailFromPage(
     detail.images.push(detail.imageUrl);
   }
 
-  // Try to extract price from embedded JSON
+  // Extract the price, but only from listing-scoped sources. A full item page
+  // embeds hundreds of unrelated "amount"/"price"/"formatted_amount" keys
+  // (ads, related items, config), so a first-match on those grabs the wrong
+  // number for every listing. We therefore trust only the explicit price meta
+  // tags or a formatted_amount nested inside a listing_price node, and
+  // otherwise leave the price empty so the authoritative search price stands.
   const priceMatch =
-    html.match(/"formatted_amount"\s*:\s*"([^"]+)"/) ??
-    html.match(/"price"\s*:\s*"([^"]+)"/) ??
-    html.match(/\"amount\"\s*:\s*"([^"]+)"/);
-  if (priceMatch) detail.price = priceMatch[1];
+    html.match(
+      /<meta\s+property="(?:og:price:amount|product:price:amount)"\s+content="([^"]*)"/
+    ) ??
+    html.match(
+      /"(?:marketplace_)?listing_price"\s*:\s*\{[^}]*?"formatted_amount"\s*:\s*"([^"]+)"/
+    );
+  if (priceMatch) detail.price = decodeHtmlEntities(priceMatch[1]);
 
   // Extract additional images
   const imageRegex = /marketplace_listing_photos.*?"uri"\s*:\s*"([^"]+)"/g;
